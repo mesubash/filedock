@@ -17,14 +17,42 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Validate password
+    if (password.length < 3) {
+      toast.error('Password must be at least 3 characters');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       toast.success('Login successful');
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed');
+      // Handle different error types
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        if (message.includes('422') || message.includes('unprocessable')) {
+          toast.error('Invalid email or password format');
+        } else if (message.includes('401') || message.includes('unauthorized')) {
+          toast.error('Invalid email or password');
+        } else if (message.includes('403') || message.includes('forbidden')) {
+          toast.error('Account is disabled. Contact administrator.');
+        } else {
+          toast.error(error.message);
+        }
+      } else {
+        toast.error('Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -5,7 +5,27 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 export interface User {
   id: number;
   email: string;
+  is_admin: boolean;
+  is_active: boolean;
   created_at: string;
+}
+
+export interface UserCreate {
+  email: string;
+  password: string;
+  is_admin?: boolean;
+}
+
+export interface UserUpdate {
+  email?: string;
+  password?: string;
+  is_admin?: boolean;
+  is_active?: boolean;
+}
+
+export interface UserListResponse {
+  users: User[];
+  total: number;
 }
 
 // ============ Folder Types ============
@@ -122,20 +142,46 @@ function getAuthHeaders(): HeadersInit {
         return {
           Authorization: `Bearer ${parsed.state.token}`,
         };
+      } else {
+        console.warn("No token found in auth storage state");
       }
-    } catch {
-      // Invalid token format
+    } catch (e) {
+      console.error("Failed to parse auth storage:", e);
     }
+  } else {
+    console.warn("No auth-storage found in localStorage");
   }
   return {};
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: "An error occurred" }));
-    throw new ApiError(response.status, error.detail || "An error occurred");
+    let errorMessage = "An error occurred";
+
+    try {
+      const error = await response.json();
+
+      // Handle FastAPI validation errors (422)
+      if (response.status === 422 && error.detail) {
+        if (Array.isArray(error.detail)) {
+          // Pydantic validation errors
+          const messages = error.detail.map((err: any) => {
+            const field = err.loc?.join(".") || "field";
+            return `${field}: ${err.msg}`;
+          });
+          errorMessage = messages.join(", ");
+        } else {
+          errorMessage = error.detail;
+        }
+      } else if (error.detail) {
+        errorMessage = error.detail;
+      }
+    } catch {
+      // If JSON parsing fails, use status text
+      errorMessage = response.statusText || `Error ${response.status}`;
+    }
+
+    throw new ApiError(response.status, errorMessage);
   }
   return response.json();
 }
@@ -458,6 +504,83 @@ export const api = {
           },
         }
       );
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ detail: "Delete failed" }));
+        throw new ApiError(response.status, error.detail || "Delete failed");
+      }
+    },
+  },
+
+  users: {
+    list: async (
+      page: number = 1,
+      perPage: number = 20
+    ): Promise<UserListResponse> => {
+      const params = new URLSearchParams();
+      params.append("page", String(page));
+      params.append("per_page", String(perPage));
+      const response = await fetch(
+        `${API_BASE_URL}/api/users?${params.toString()}`,
+        {
+          headers: {
+            ...getAuthHeaders(),
+          },
+        }
+      );
+      return handleResponse<UserListResponse>(response);
+    },
+
+    getById: async (id: number): Promise<User> => {
+      const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      return handleResponse<User>(response);
+    },
+
+    getMe: async (): Promise<User> => {
+      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
+      return handleResponse<User>(response);
+    },
+
+    create: async (data: UserCreate): Promise<User> => {
+      const response = await fetch(`${API_BASE_URL}/api/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(data),
+      });
+      return handleResponse<User>(response);
+    },
+
+    update: async (id: number, data: UserUpdate): Promise<User> => {
+      const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(data),
+      });
+      return handleResponse<User>(response);
+    },
+
+    delete: async (id: number): Promise<void> => {
+      const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+        method: "DELETE",
+        headers: {
+          ...getAuthHeaders(),
+        },
+      });
       if (!response.ok) {
         const error = await response
           .json()
