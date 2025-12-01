@@ -26,7 +26,7 @@ export default function UploadFile() {
   const [searchParams] = useSearchParams();
   const folderId = searchParams.get('folder') || undefined;
   
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
   const [customName, setCustomName] = useState('');
   const [description, setDescription] = useState('');
@@ -51,25 +51,47 @@ export default function UploadFile() {
   }, [folderId]);
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     setIsUploading(true);
+    let successCount = 0;
+    let failCount = 0;
+
     try {
-      await api.files.upload({
-        file: selectedFile,
-        isPublic: visibility === 'public',
-        customName: visibility === 'public' && customName ? customName : undefined,
-        description: description || undefined,
-        fileType: fileType || undefined,
-        tags: tags || undefined,
-        folderId: folderId,
-        onProgress: setUploadProgress,
-      });
-      toast.success('File uploaded successfully');
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        try {
+          await api.files.upload({
+            file,
+            isPublic: visibility === 'public',
+            customName: visibility === 'public' && customName ? `${customName}-${i}` : undefined,
+            description: description || undefined,
+            fileType: fileType || undefined,
+            tags: tags || undefined,
+            folderId: folderId,
+            onProgress: (progress) => {
+              const overallProgress = Math.round(((i + progress / 100) / selectedFiles.length) * 100);
+              setUploadProgress(overallProgress);
+            },
+          });
+          successCount++;
+        } catch (error) {
+          failCount++;
+          console.error(`Failed to upload ${file.name}:`, error);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to upload ${failCount} file${failCount !== 1 ? 's' : ''}`);
+      }
+
       // Navigate back to the folder or file browser
       navigate(folderId ? `/dashboard/browse?folder=${folderId}` : '/dashboard/browse');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Upload failed');
+      toast.error('Upload failed');
       setIsUploading(false);
     }
   };
@@ -108,17 +130,17 @@ export default function UploadFile() {
           )}
 
           <FileUploader
-            onFileSelect={setSelectedFile}
-            selectedFile={selectedFile}
+            onFileSelect={setSelectedFiles}
+            selectedFiles={selectedFiles}
             onClear={() => {
-              setSelectedFile(null);
+              setSelectedFiles([]);
               setUploadProgress(0);
             }}
             uploadProgress={uploadProgress}
             isUploading={isUploading}
           />
 
-          {selectedFile && !isUploading && (
+          {selectedFiles.length > 0 && !isUploading && (
             <div className="space-y-4">
               <div>
                 <Label className="text-base mb-3 block">Visibility</Label>
@@ -212,7 +234,7 @@ export default function UploadFile() {
               </div>
 
               <Button onClick={handleUpload} className="w-full" size="lg">
-                Upload File
+                Upload {selectedFiles.length} File{selectedFiles.length !== 1 ? 's' : ''}
               </Button>
             </div>
           )}
