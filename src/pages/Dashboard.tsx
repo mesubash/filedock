@@ -1,10 +1,32 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Files, TrendingUp } from 'lucide-react';
+import { api } from '@/lib/api/client';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({ totalFiles: 0, totalSize: 0 });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const data = await api.files.list(1, 100);
+        const totalSize = data.files.reduce((sum, file) => sum + file.size, 0);
+        setStats({ totalFiles: data.total, totalSize });
+      } catch (error) {
+        // Stats are optional, don't show error
+      }
+    };
+    loadStats();
+  }, []);
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  };
 
   return (
     <div className="space-y-6">
@@ -55,8 +77,8 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2 Files</div>
-            <p className="text-sm text-muted-foreground">3.1 MB total</p>
+            <div className="text-2xl font-bold">{stats.totalFiles} Files</div>
+            <p className="text-sm text-muted-foreground">{formatSize(stats.totalSize)} total</p>
           </CardContent>
         </Card>
       </div>
