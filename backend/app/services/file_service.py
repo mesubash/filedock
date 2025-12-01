@@ -190,10 +190,16 @@ class FileService:
         is_public: bool = None,
         search: str = None,
         tags: str = None,
-        folder_id: Optional[UUID] = None
+        folder_id: Optional[UUID] = None,
+        user_id: int = None,
+        is_admin: bool = False
     ) -> tuple[list[FileResponse], int]:
-        """List all files with pagination and filtering"""
+        """List files with pagination and filtering. Non-admins only see their own files."""
         query = self.db.query(File)
+        
+        # Non-admins can only see their own files
+        if not is_admin and user_id:
+            query = query.filter(File.uploaded_by == user_id)
         
         # Apply filters
         if file_type:
@@ -233,7 +239,7 @@ class FileService:
         
         return [self._to_response(f) for f in files], total
 
-    def move_file(self, file_id: UUID, folder_id: Optional[UUID]) -> FileResponse:
+    def move_file(self, file_id: UUID, folder_id: Optional[UUID], user_id: int = None, is_admin: bool = False) -> FileResponse:
         """Move file to a different folder or to root (folder_id=None)"""
         db_file = self.db.query(File).filter(File.id == file_id).first()
         
@@ -241,6 +247,13 @@ class FileService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File not found"
+            )
+        
+        # Non-admins can only move their own files
+        if not is_admin and db_file.uploaded_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to move this file"
             )
         
         # Validate target folder exists if specified
@@ -251,6 +264,12 @@ class FileService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Target folder not found"
                 )
+            # Non-admins can only move to their own folders
+            if not is_admin and folder.created_by != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You don't have permission to move files to this folder"
+                )
         
         db_file.folder_id = folder_id
         self.db.commit()
@@ -258,7 +277,7 @@ class FileService:
         
         return self._to_response(db_file)
 
-    def get_file_by_id(self, file_id: UUID) -> FileResponse:
+    def get_file_by_id(self, file_id: UUID, user_id: int = None, is_admin: bool = False) -> FileResponse:
         """Get file metadata by ID"""
         db_file = self.db.query(File).filter(File.id == file_id).first()
         
@@ -268,9 +287,16 @@ class FileService:
                 detail="File not found"
             )
         
+        # Non-admins can only see their own files
+        if not is_admin and db_file.uploaded_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to view this file"
+            )
+        
         return self._to_response(db_file)
 
-    def get_file_record_by_id(self, file_id: UUID) -> File:
+    def get_file_record_by_id(self, file_id: UUID, user_id: int = None, is_admin: bool = False) -> File:
         """Get raw file record by ID"""
         db_file = self.db.query(File).filter(File.id == file_id).first()
         
@@ -278,6 +304,13 @@ class FileService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File not found"
+            )
+        
+        # Non-admins can only access their own files
+        if not is_admin and db_file.uploaded_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this file"
             )
         
         return db_file
@@ -306,7 +339,7 @@ class FileService:
         
         return db_file
 
-    async def delete_file(self, file_id: UUID) -> bool:
+    async def delete_file(self, file_id: UUID, user_id: int = None, is_admin: bool = False) -> bool:
         """Delete file from storage and DB"""
         db_file = self.db.query(File).filter(File.id == file_id).first()
         
@@ -314,6 +347,13 @@ class FileService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File not found"
+            )
+        
+        # Non-admins can only delete their own files
+        if not is_admin and db_file.uploaded_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete this file"
             )
         
         # Delete from storage
@@ -325,7 +365,7 @@ class FileService:
         
         return True
 
-    def update_file(self, file_id: UUID, description: str = None, tags: str = None, file_type: str = None) -> FileResponse:
+    def update_file(self, file_id: UUID, description: str = None, tags: str = None, file_type: str = None, user_id: int = None, is_admin: bool = False) -> FileResponse:
         """Update file metadata"""
         db_file = self.db.query(File).filter(File.id == file_id).first()
         
@@ -333,6 +373,13 @@ class FileService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File not found"
+            )
+        
+        # Non-admins can only update their own files
+        if not is_admin and db_file.uploaded_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to update this file"
             )
         
         if description is not None:
@@ -354,7 +401,9 @@ class FileService:
         description: str = None, 
         tags: str = None, 
         file_type: str = None,
-        custom_name: str = None
+        custom_name: str = None,
+        user_id: int = None,
+        is_admin: bool = False
     ) -> FileResponse:
         """Update file visibility and metadata. Generates slug when making public."""
         db_file = self.db.query(File).filter(File.id == file_id).first()
@@ -363,6 +412,13 @@ class FileService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="File not found"
+            )
+        
+        # Non-admins can only update their own files
+        if not is_admin and db_file.uploaded_by != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to update this file"
             )
         
         # Handle visibility change

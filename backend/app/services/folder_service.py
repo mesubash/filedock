@@ -9,8 +9,18 @@ from app.services.storage_service import storage_service
 
 
 class FolderService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int = None, is_admin: bool = False):
         self.db = db
+        self.user_id = user_id
+        self.is_admin = is_admin
+
+    def _check_folder_access(self, folder: Folder, action: str = "access"):
+        """Check if user has access to a folder"""
+        if not self.is_admin and folder.created_by != self.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You don't have permission to {action} this folder"
+            )
 
     def create_folder(self, folder_data: FolderCreate, user_id: int) -> FolderResponse:
         """Create a new folder"""
@@ -22,14 +32,21 @@ class FolderService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Parent folder not found"
                 )
+            # Non-admins can only create in their own folders
+            if not self.is_admin and parent.created_by != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You don't have permission to create folders here"
+                )
         
-        # Check for duplicate name in same parent
-        existing = self.db.query(Folder).filter(
+        # Check for duplicate name in same parent (for this user)
+        existing_query = self.db.query(Folder).filter(
             Folder.name == folder_data.name,
-            Folder.parent_id == folder_data.parent_id
-        ).first()
+            Folder.parent_id == folder_data.parent_id,
+            Folder.created_by == user_id
+        )
         
-        if existing:
+        if existing_query.first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A folder with this name already exists in this location"
@@ -57,12 +74,22 @@ class FolderService:
                 detail="Folder not found"
             )
         
+        self._check_folder_access(folder, "view")
+        
         return self._to_response(folder)
 
     def get_folder_contents(self, folder_id: Optional[UUID] = None) -> FolderWithContents:
         """Get folder contents including subfolders and files"""
         from app.services.file_service import FileService
         file_service = FileService(self.db)
+        
+        # Build base query for folders and files - filter by user for non-admins
+        folder_query = self.db.query(Folder)
+        file_query = self.db.query(File)
+        
+        if not self.is_admin:
+            folder_query = folder_query.filter(Folder.created_by == self.user_id)
+            file_query = file_query.filter(File.uploaded_by == self.user_id)
         
         if folder_id:
             folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
@@ -72,11 +99,13 @@ class FolderService:
                     detail="Folder not found"
                 )
             
-            # Get subfolders
-            subfolders = self.db.query(Folder).filter(Folder.parent_id == folder_id).order_by(Folder.name).all()
+            self._check_folder_access(folder, "view")
             
-            # Get files in this folder
-            files = self.db.query(File).filter(File.folder_id == folder_id).order_by(File.original_name).all()
+            # Get subfolders (owned by this user or all for admin)
+            subfolders = folder_query.filter(Folder.parent_id == folder_id).order_by(Folder.name).all()
+            
+            # Get files in this folder (owned by this user or all for admin)
+            files = file_query.filter(File.folder_id == folder_id).order_by(File.original_name).all()
             
             return FolderWithContents(
                 id=folder.id,
@@ -91,15 +120,15 @@ class FolderService:
                 files=[file_service._to_response(f) for f in files]
             )
         else:
-            # Root level - get folders and files with no parent
-            subfolders = self.db.query(Folder).filter(Folder.parent_id == None).order_by(Folder.name).all()
-            files = self.db.query(File).filter(File.folder_id == None).order_by(File.original_name).all()
+            # Root level - get folders and files with no parent (owned by this user or all for admin)
+            subfolders = folder_query.filter(Folder.parent_id == None).order_by(Folder.name).all()
+            files = file_query.filter(File.folder_id == None).order_by(File.original_name).all()
             
             return FolderWithContents(
                 id=UUID('00000000-0000-0000-0000-000000000000'),  # Dummy ID for root
                 name="Root",
                 parent_id=None,
-                created_by=0,
+                created_by=self.user_id or 0,
                 created_at=None,
                 updated_at=None,
                 file_count=len(files),
@@ -111,6 +140,10 @@ class FolderService:
     def list_folders(self, parent_id: Optional[UUID] = None) -> List[FolderResponse]:
         """List all folders in a parent (or root if parent_id is None)"""
         query = self.db.query(Folder)
+        
+        # Non-admins only see their own folders
+        if not self.is_admin:
+            query = query.filter(Folder.created_by == self.user_id)
         
         if parent_id:
             query = query.filter(Folder.parent_id == parent_id)
@@ -129,6 +162,8 @@ class FolderService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Folder not found"
             )
+        
+        self._check_folder_access(folder, "update")
         
         # Check for circular reference if moving
         if folder_data.parent_id is not None:
@@ -179,6 +214,8 @@ class FolderService:
                 detail="Folder not found"
             )
         
+        self._check_folder_access(folder, "delete")
+        
         if recursive:
             # Delete all files in this folder and subfolders
             await self._delete_folder_contents(folder)
@@ -221,6 +258,12 @@ class FolderService:
             folder = self.db.query(Folder).filter(Folder.id == current_id).first()
             if not folder:
                 break
+            # Check access for non-admins
+            if not self.is_admin and folder.created_by != self.user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You don't have permission to access this folder"
+                )
             breadcrumbs.insert(0, FolderBreadcrumb(id=folder.id, name=folder.name))
             current_id = folder.parent_id
         
@@ -228,12 +271,24 @@ class FolderService:
 
     def get_folder_tree(self) -> List[FolderTreeNode]:
         """Get complete folder tree structure"""
-        root_folders = self.db.query(Folder).filter(Folder.parent_id == None).order_by(Folder.name).all()
+        query = self.db.query(Folder).filter(Folder.parent_id == None)
+        
+        # Non-admins only see their own folders
+        if not self.is_admin:
+            query = query.filter(Folder.created_by == self.user_id)
+        
+        root_folders = query.order_by(Folder.name).all()
         return [self._build_tree_node(f) for f in root_folders]
 
     def _build_tree_node(self, folder: Folder) -> FolderTreeNode:
         """Recursively build tree node"""
-        children = self.db.query(Folder).filter(Folder.parent_id == folder.id).order_by(Folder.name).all()
+        query = self.db.query(Folder).filter(Folder.parent_id == folder.id)
+        
+        # Non-admins only see their own folders
+        if not self.is_admin:
+            query = query.filter(Folder.created_by == self.user_id)
+        
+        children = query.order_by(Folder.name).all()
         return FolderTreeNode(
             id=folder.id,
             name=folder.name,
