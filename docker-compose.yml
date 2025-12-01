@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -31,7 +29,9 @@ services:
     container_name: filedock-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.local
+      # Use .env.local if it exists (development), otherwise .env (production)
+      - .env${ENV_SUFFIX:-.local}
+      - .env
     environment:
       # Override DATABASE_URL to use Docker postgres service
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-filedock}:${POSTGRES_PASSWORD:-filedock_secure_password}@postgres:5432/${POSTGRES_DB:-filemanager}
