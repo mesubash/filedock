@@ -1,6 +1,10 @@
 // API client for backend communication
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// In production (Docker), nginx proxies /api to backend
+// In development, use VITE_API_URL or default to localhost:8000
+const API_BASE_URL = import.meta.env.PROD
+  ? "" // Use relative URLs in production (nginx handles proxy)
+  : import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface User {
   id: number;

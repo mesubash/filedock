@@ -1,0 +1,76 @@
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info
+dist
+build
+.eggs
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.hypothesis
+
+# Virtual environments
+venv
+env
+.venv
+ENV
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# Logs
+*.log
+logs
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Testing
+tests
+test_*
+*_test.py
+
+# Development
+uploads
+.mypy_cache
+.dmypy.json
+dmypy.json
