@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, files, public, folders
+from app.api import auth, files, public, folders, users
 from app.core.database import Base, engine
 
 # Create database tables
@@ -32,6 +32,7 @@ async def health():
 
 # Register routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(folders.router, prefix="/api/folders", tags=["Folders"])
 app.include_router(public.router, prefix="/api/public", tags=["Public Files"])
