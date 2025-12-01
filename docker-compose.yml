@@ -29,8 +29,6 @@ services:
     container_name: filedock-backend
     restart: unless-stopped
     env_file:
-      # Use .env.local if it exists (development), otherwise .env (production)
-      - .env${ENV_SUFFIX:-.local}
       - .env
     environment:
       # Override DATABASE_URL to use Docker postgres service
