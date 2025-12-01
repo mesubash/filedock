@@ -1,15 +1,17 @@
-# FastAPI Backend Setup
+# FileDock Backend - FastAPI File Management System
 
-This is the backend structure for the File Manager application using FastAPI and PostgreSQL.
+Backend API for FileDock file management system with user authentication, role-based access control, and cloud storage integration.
 
 ## Tech Stack
 
-- **FastAPI** - Modern Python web framework
+- **FastAPI** - Modern Python web framework with automatic API docs
 - **SQLAlchemy** - ORM for database operations
-- **Alembic** - Database migrations
-- **PostgreSQL** - Database
-- **JWT** - Authentication
-- **Boto3/MinIO** - S3-compatible storage (Garage)
+- **PostgreSQL** - Relational database
+- **Pydantic** - Data validation and settings
+- **JWT** - Token-based authentication
+- **Boto3** - S3-compatible storage (Garage)
+- **Uvicorn** - ASGI server
+- **Python 3.13+** - Latest Python features
 
 ## Directory Structure
 
@@ -19,7 +21,11 @@ backend/
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── auth.py          # Authentication endpoints
-│   │   └── files.py         # File management endpoints
+│   │   ├── files.py         # File management endpoints
+│   │   ├── folders.py       # Folder management endpoints
+│   │   ├── users.py         # User management (admin only)
+│   │   ├── public.py        # Public file access
+│   │   └── deps.py          # Dependencies (auth, db)
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py        # Configuration settings
@@ -28,165 +34,414 @@ backend/
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── user.py          # User model
-│   │   └── file.py          # File model
+│   │   └── file.py          # File and Folder models
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── auth.py          # Auth Pydantic schemas
-│   │   └── file.py          # File Pydantic schemas
+│   │   └── file.py          # File/Folder Pydantic schemas
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── auth_service.py  # Authentication logic
-│   │   ├── file_service.py  # File management logic
-│   │   └── storage_service.py # S3/Garage integration
-│   └── main.py              # FastAPI app entry point
-├── alembic/                 # Database migrations
+│   │   ├── auth_service.py     # Authentication logic
+│   │   ├── file_service.py     # File management logic
+│   │   ├── folder_service.py   # Folder management logic
+│   │   └── storage_service.py  # Cloud storage integration
+│   ├── main.py              # FastAPI app entry point
+│   ├── migrate.py           # Database migrations
+│   └── seed.py              # Seed initial data
 ├── requirements.txt         # Python dependencies
-└── .env.example            # Environment variables template
+├── .env.example            # Environment variables template
+└── README.md               # This file
 ```
+
+## Features
+
+- ✅ JWT authentication with password hashing
+- ✅ User management with admin role
+- ✅ User isolation (users see only their files)
+- ✅ File upload/download with streaming
+- ✅ Public and private file visibility
+- ✅ Folder organization with breadcrumbs
+- ✅ File preview and download
+- ✅ Custom friendly URLs for public files
+- ✅ Cloud storage (Garage S3-compatible)
+- ✅ Pagination and filtering
+- ✅ Search functionality
+- ✅ File metadata (tags, description, type)
+- ✅ Auto-generated API documentation
 
 ## Setup Instructions
 
-### 1. Create Virtual Environment
+### 1. Prerequisites
+
+- Python 3.13 or higher
+- PostgreSQL 14+
+- Garage or S3-compatible storage
+- Virtual environment tool (venv)
+
+### 2. Create Virtual Environment
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-### 2. Install Dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+### 4. Configure Environment
 
-Copy `.env.example` to `.env` and configure:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your settings:
-- Database credentials
-- JWT secret key
-- Garage/S3 configuration
-
-### 4. Initialize Database
+Copy `.env.example` to `.env.local` and configure:
 
 ```bash
-# Create database tables
-alembic upgrade head
-
-# Create admin user (optional)
-python scripts/create_admin.py
+cp .env.example .env.local
 ```
 
-### 5. Run Development Server
+Edit `.env.local` with your settings:
+
+```env
+# Database Configuration
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/filedock
+
+# JWT Configuration
+SECRET_KEY=your-secret-key-here-use-openssl-rand-hex-32
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Cloud Storage Configuration
+STORAGE_ENDPOINT=https://garage.rivetsoft.com
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key
+STORAGE_BUCKET=your-bucket-name
+STORAGE_REGION=garage
+STORAGE_PREFIX=filedock
+
+# CORS Configuration
+FRONTEND_URL=http://localhost:5173
+```
+
+### 5. Initialize Database
+
+```bash
+# Run migrations to create tables
+python -m app.migrate
+
+# Seed database with initial users
+python -m app.seed
+```
+
+This creates two users:
+
+- **Admin**: `admin@example.com` / `admin123`
+- **User**: `user@example.com` / `user123`
+
+### 6. Run Development Server
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-API will be available at: http://localhost:8000
-API docs: http://localhost:8000/docs
+**Access Points:**
 
-## Environment Variables
-
-Required variables in `.env`:
-
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost/filemanager
-
-# JWT
-SECRET_KEY=your-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# Garage/S3 Storage
-GARAGE_ENDPOINT=http://localhost:3900
-GARAGE_ACCESS_KEY=your-access-key
-GARAGE_SECRET_KEY=your-secret-key
-GARAGE_BUCKET=files
-GARAGE_REGION=garage
-
-# CORS
-FRONTEND_URL=http://localhost:8080
-```
+- API: <http://localhost:8000>
+- Interactive API docs: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+- Health check: <http://localhost:8000/health>
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login and get JWT token
-- `POST /api/auth/register` - Register new user (optional)
 
-### Files (Requires Authentication)
-- `POST /api/files/upload` - Upload file (streaming)
-- `GET /api/files` - List all files
-- `GET /api/files/{file_id}` - Get file metadata
-- `DELETE /api/files/{file_id}` - Delete file
-- `GET /api/public/{file_key}` - Serve public file (no auth)
-- `GET /api/private/{file_key}` - Serve private file (requires auth)
+- `POST /api/auth/login` - Login and receive JWT token
+- `POST /api/auth/register` - Register new user
+- `GET /api/auth/me` - Get current user information
+
+### Files (Authentication Required)
+
+- `POST /api/files/upload` - Upload file with metadata
+- `GET /api/files` - List files (paginated, with filters)
+- `GET /api/files/{id}` - Get file metadata by ID
+- `GET /api/files/view/{id}` - View file inline in browser
+- `GET /api/files/download/{id}` - Download file
+- `PUT /api/files/{id}` - Update file metadata and visibility
+- `PUT /api/files/{id}/move` - Move file to different folder
+- `DELETE /api/files/{id}` - Delete file
+
+### Folders (Authentication Required)
+
+- `POST /api/folders` - Create new folder
+- `GET /api/folders` - List all folders
+- `GET /api/folders/tree` - Get complete folder tree
+- `GET /api/folders/contents` - Get folder contents (files + subfolders)
+- `GET /api/folders/{id}` - Get folder by ID
+- `GET /api/folders/{id}/breadcrumbs` - Get breadcrumb trail
+- `PUT /api/folders/{id}` - Update folder (rename, move)
+- `DELETE /api/folders/{id}` - Delete folder
+
+### Users (Admin Only)
+
+- `GET /api/users/` - List all users (paginated)
+- `POST /api/users/` - Create new user
+- `GET /api/users/{id}` - Get user by ID
+- `PUT /api/users/{id}` - Update user (email, password, role, status)
+- `DELETE /api/users/{id}` - Delete user
+
+### Public Files (No Authentication)
+
+- `GET /api/public/{slug}` - Download public file by slug
+- `GET /api/public/view/{slug}` - View public file inline
 
 ## Database Models
 
 ### User
+
 ```python
-- id: UUID (PK)
-- email: String (unique)
-- password_hash: String
-- created_at: DateTime
+class User(Base):
+    id: int (PK)
+    email: str (unique, indexed)
+    password_hash: str
+    is_admin: bool (default=False)
+    is_active: bool (default=True)
+    created_at: datetime
 ```
 
 ### File
+
 ```python
-- id: UUID (PK)
-- original_name: String
-- storage_key: String (unique)
-- is_public: Boolean
-- size: Integer
-- created_at: DateTime
-- uploaded_by: UUID (FK -> User)
+class File(Base):
+    id: UUID (PK)
+    original_name: str
+    storage_key: str (unique)
+    slug: str (unique, for public URLs)
+    is_public: bool
+    content_type: str
+    file_size: int (bytes)
+    file_type: str (document, image, video, etc.)
+    description: str (optional)
+    tags: list[str] (optional)
+    custom_name: str (optional, for friendly URLs)
+    folder_id: UUID (FK -> Folder, nullable)
+    uploaded_by: int (FK -> User)
+    created_at: datetime
+    updated_at: datetime
 ```
 
-## Key Features to Implement
+### Folder
 
-1. **Streaming File Upload/Download** - Avoid loading entire file in RAM
-2. **JWT Authentication** - Secure private endpoints
-3. **File Validation** - Type and size checks
-4. **S3 Integration** - Use boto3 or minio-py client
-5. **Database Transactions** - Proper error handling
-6. **CORS Configuration** - Allow frontend requests
-7. **Logging** - Structured logging for debugging
+```python
+class Folder(Base):
+    id: UUID (PK)
+    name: str
+    parent_id: UUID (FK -> Folder, nullable)
+    created_by: int (FK -> User)
+    created_at: datetime
+    updated_at: datetime
+```
+
+## Key Implementation Details
+
+### User Isolation
+
+- Non-admin users can only see/access their own files and folders
+- Implemented at service layer with `user_id` and `is_admin` checks
+- SQL queries filtered by `uploaded_by` or `created_by`
+
+### File Slugs
+
+Generated using patterns:
+
+- **readable**: `adjective-noun-xxxx` (e.g., `swift-star-a7b3`)
+- **short**: `xxxx-xxxx` (e.g., `a7b3-c9d1`)
+- **named**: `custom-name-xxxx` (e.g., `my-document-a7b3`)
+
+### Storage Organization
+
+Files stored with structure:
+
+```
+{prefix}/files/{uuid}-{filename}
+Example: filedock/files/abc123-document.pdf
+```
+
+### Authentication Flow
+
+1. User logs in with email/password
+2. Backend validates credentials
+3. Returns JWT token + user info
+4. Frontend stores token in localStorage
+5. Token sent in `Authorization: Bearer {token}` header
+6. Backend validates token on protected routes
+
+### Error Handling
+
+- 400: Bad request (validation errors)
+- 401: Unauthorized (missing/invalid token)
+- 403: Forbidden (insufficient permissions)
+- 404: Not found
+- 422: Unprocessable entity (Pydantic validation)
+- 500: Internal server error
+
+## Development
+
+### Run with Auto-Reload
+
+```bash
+uvicorn app.main:app --reload
+```
+
+### Access API Documentation
+
+Visit <http://localhost:8000/docs> for interactive Swagger UI
+
+### Run Migrations
+
+```bash
+python -m app.migrate
+```
+
+### Seed Database
+
+```bash
+python -m app.seed
+```
+
+### Check Database
+
+```bash
+# Connect to PostgreSQL
+psql -U user -d filedock
+
+# List tables
+\dt
+
+# Query users
+SELECT id, email, is_admin, is_active FROM users;
+
+# Query files
+SELECT id, original_name, is_public, uploaded_by FROM files LIMIT 10;
+```
 
 ## Production Deployment
 
-1. Use proper ASGI server (Gunicorn + Uvicorn)
-2. Configure PostgreSQL with connection pooling
-3. Set up proper logging
-4. Use environment-specific configs
-5. Enable HTTPS
-6. Configure rate limiting
-7. Set up monitoring
+### 1. Server Setup
 
-## Testing
+Use Gunicorn with Uvicorn workers:
 
 ```bash
-# Run tests
-pytest
+pip install gunicorn uvicorn[standard]
 
-# With coverage
-pytest --cov=app tests/
+gunicorn app.main:app \
+  -w 4 \
+  -k uvicorn.workers.UvicornWorker \
+  --bind 0.0.0.0:8000 \
+  --access-logfile - \
+  --error-logfile -
 ```
+
+### 2. Environment Configuration
+
+- Use `.env.local` for production settings
+- Set strong `SECRET_KEY` (32+ characters)
+- Use production database with connection pooling
+- Configure CORS for your frontend domain
+- Set `FRONTEND_URL` to production URL
+
+### 3. Security Checklist
+
+- ✅ HTTPS enabled
+- ✅ Strong JWT secret key
+- ✅ Password hashing (bcrypt)
+- ✅ CORS properly configured
+- ✅ Database credentials secured
+- ✅ Storage credentials secured
+- ✅ Rate limiting (optional, use nginx)
+- ✅ Firewall rules
+- ✅ Regular security updates
+
+### 4. Database
+
+- Use PostgreSQL with SSL
+- Enable connection pooling
+- Regular backups
+- Index optimization
+
+### 5. Storage
+
+- Verify bucket exists and is accessible
+- Set proper bucket policies
+- Enable CORS if needed
+- Monitor storage usage
+
+### 6. Monitoring
+
+- Set up logging (structured JSON logs)
+- Monitor API response times
+- Track error rates
+- Monitor database connections
+- Set up alerts
+
+## Troubleshooting
+
+### Storage credentials error
+
+```
+ValueError: Storage credentials not configured
+```
+
+**Solution**: Check that `.env.local` has:
+
+- `STORAGE_ACCESS_KEY`
+- `STORAGE_SECRET_KEY`
+- `STORAGE_ENDPOINT`
+- `STORAGE_BUCKET`
+
+### Database connection error
+
+```
+sqlalchemy.exc.OperationalError: could not connect to server
+```
+
+**Solution**:
+
+- Verify PostgreSQL is running
+- Check `DATABASE_URL` format
+- Ensure database exists: `createdb filedock`
+
+### Import errors
+
+```
+ModuleNotFoundError: No module named 'fastapi'
+```
+
+**Solution**: Activate virtual environment and install dependencies:
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 401 Unauthorized
+
+**Solution**:
+
+- Check token is being sent in Authorization header
+- Verify token hasn't expired
+- User may need to logout and login again
 
 ## Notes
 
-- Always use async/await for database and storage operations
-- Stream large files to avoid memory issues
-- Validate file types before storage
-- Use transactions for database operations
-- Log all errors with context
-- Return proper HTTP status codes
-- Document all endpoints with OpenAPI
+- All file operations use streaming to avoid memory issues
+- Database operations use SQLAlchemy ORM
+- File validation happens before storage
+- Proper HTTP status codes returned
+- All endpoints documented with OpenAPI
+- Error messages don't expose internal details (security)
+- Admin operations have role checks
+- User isolation enforced at service layer
+
+## License
+
+MIT
