@@ -1,4 +1,4 @@
-import { Upload, Files, FileStack } from 'lucide-react';
+import { Upload, Files, FileStack, FolderOpen } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import {
   Sidebar,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/sidebar';
 
 const menuItems = [
+  { title: 'Browse Files', url: '/dashboard/browse', icon: FolderOpen },
   { title: 'Upload File', url: '/dashboard/upload', icon: Upload },
   { title: 'All Files', url: '/dashboard/files', icon: Files },
 ];
