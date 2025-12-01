@@ -4,10 +4,10 @@ import os
 from pathlib import Path
 
 
-# Get the backend directory (where this file is located)
-BACKEND_DIR = Path(__file__).parent.parent.parent
-ENV_FILE = BACKEND_DIR / ".env"
-ENV_LOCAL_FILE = BACKEND_DIR / ".env.local"
+# Get the root directory (parent of backend/)
+ROOT_DIR = Path(__file__).parent.parent.parent.parent
+ENV_FILE = ROOT_DIR / ".env"
+ENV_LOCAL_FILE = ROOT_DIR / ".env.local"
 
 # Determine which env file to use
 env_file_to_use = ENV_LOCAL_FILE if ENV_LOCAL_FILE.exists() else ENV_FILE
