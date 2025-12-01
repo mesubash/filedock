@@ -18,11 +18,13 @@ def seed_users():
         default_users = [
             {
                 "email": "admin@hgn.com.np",
-                "password": "adminpassword"
+                "password": "adminpassword",
+                "is_admin": True
             },
             {
                 "email": "user@hgn.com.np", 
-                "password": "userpassword"
+                "password": "userpassword",
+                "is_admin": False
             }
         ]
         
@@ -31,22 +33,29 @@ def seed_users():
             existing_user = db.query(User).filter(User.email == user_data["email"]).first()
             
             if existing_user:
-                print(f"User {user_data['email']} already exists, skipping...")
+                # Update is_admin flag if needed
+                if existing_user.is_admin != user_data["is_admin"]:
+                    existing_user.is_admin = user_data["is_admin"]
+                    db.commit()
+                    print(f"Updated {user_data['email']} - is_admin: {user_data['is_admin']}")
+                else:
+                    print(f"User {user_data['email']} already exists, skipping...")
                 continue
             
             # Create new user
             user = User(
                 email=user_data["email"],
-                password_hash=get_password_hash(user_data["password"])
+                password_hash=get_password_hash(user_data["password"]),
+                is_admin=user_data["is_admin"]
             )
             db.add(user)
             db.commit()
-            print(f"Created user: {user_data['email']}")
+            print(f"Created user: {user_data['email']} (admin: {user_data['is_admin']})")
         
         print("\n✅ Seeding complete!")
         print("\nDefault credentials:")
-        print("  Admin: admin@hgn.com.np / adminpassword")
-        print("  User:  user@hgn.com.np / userpassword")
+        print("  Admin: admin@hgn.com.np / adminpassword (is_admin=True)")
+        print("  User:  user@hgn.com.np / userpassword (is_admin=False)")
         
     except Exception as e:
         print(f"Error seeding users: {e}")
