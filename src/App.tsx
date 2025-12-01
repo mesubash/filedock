@@ -12,7 +12,9 @@ import UploadFile from "./pages/UploadFile";
 import FilesList from "./pages/FilesList";
 import FileDetails from "./pages/FileDetails";
 import FileBrowser from "./pages/FileBrowser";
+import UserManagement from "./pages/UserManagement";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AdminRoute } from "./components/AdminRoute";
 import { useAuthStore } from "./store/auth-store";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,7 @@ const App = () => {
               <Route path="files" element={<FilesList />} />
               <Route path="files/:id" element={<FileDetails />} />
               <Route path="browse" element={<FileBrowser />} />
+              <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
