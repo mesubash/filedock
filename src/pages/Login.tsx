@@ -78,9 +78,6 @@ export default function Login() {
                 'Sign In'
               )}
             </Button>
-            <p className="text-sm text-muted-foreground text-center mt-4">
-              Demo credentials: admin@example.com / admin
-            </p>
           </form>
         </CardContent>
       </Card>
