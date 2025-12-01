@@ -23,3 +23,18 @@ dist-ssr
 *.sln
 *.sw?
 docs/
+
+# Environment files
+.env
+.env.local
+backend/.env
+backend/.env.local
+
+# Python virtual environment
+backend/.venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Uploads (local storage)
+backend/uploads/
