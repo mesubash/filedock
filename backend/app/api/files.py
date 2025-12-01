@@ -58,7 +58,7 @@ def list_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List all files with pagination and filtering"""
+    """List files with pagination and filtering. Non-admins only see their own files."""
     file_service = FileService(db)
     files, total = file_service.list_files(
         page=page, 
@@ -66,7 +66,9 @@ def list_files(
         file_type=file_type,
         is_public=is_public,
         search=search,
-        tags=tags
+        tags=tags,
+        user_id=current_user.id,
+        is_admin=current_user.is_admin
     )
     return FileListResponse(
         files=files,
@@ -76,69 +78,15 @@ def list_files(
     )
 
 
-@router.get("/{file_id}", response_model=FileResponse)
-def get_file(
-    file_id: UUID = Path(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get file metadata by ID (Admin only)"""
-    file_service = FileService(db)
-    return file_service.get_file_by_id(file_id)
-
-
-@router.put("/{file_id}/move", response_model=FileResponse)
-def move_file(
-    file_id: UUID = Path(...),
-    move_request: FileMoveRequest = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Move a file to a different folder. Set folder_id to null to move to root."""
-    file_service = FileService(db)
-    return file_service.move_file(file_id, move_request.folder_id if move_request else None)
-
-
-@router.put("/{file_id}", response_model=FileResponse)
-def update_file(
-    file_id: UUID = Path(...),
-    update_request: FileUpdateRequest = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update file metadata and visibility. Use this to toggle public/private."""
-    file_service = FileService(db)
-    return file_service.update_file_visibility(
-        file_id=file_id,
-        is_public=update_request.is_public if update_request else None,
-        description=update_request.description if update_request else None,
-        file_type=update_request.file_type if update_request else None,
-        tags=update_request.tags if update_request else None,
-        custom_name=update_request.custom_name if update_request else None
-    )
-
-
-@router.delete("/{file_id}")
-async def delete_file(
-    file_id: UUID = Path(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Delete a file (Admin only)"""
-    file_service = FileService(db)
-    await file_service.delete_file(file_id)
-    return {"message": "File deleted successfully"}
-
-
 @router.get("/download/{file_id}")
 async def download_file(
     file_id: UUID = Path(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Download a file (Admin can download both public and private files)"""
+    """Download a file"""
     file_service = FileService(db)
-    file_record = file_service.get_file_record_by_id(file_id)
+    file_record = file_service.get_file_record_by_id(file_id, user_id=current_user.id, is_admin=current_user.is_admin)
     
     content, content_type = await storage_service.get_file(file_record.storage_key)
     
@@ -158,9 +106,9 @@ async def view_file(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """View a file inline (Admin can view both public and private files)"""
+    """View a file inline"""
     file_service = FileService(db)
-    file_record = file_service.get_file_record_by_id(file_id)
+    file_record = file_service.get_file_record_by_id(file_id, user_id=current_user.id, is_admin=current_user.is_admin)
     
     content, content_type = await storage_service.get_file(file_record.storage_key)
     
@@ -172,3 +120,65 @@ async def view_file(
             "Content-Length": str(len(content))
         }
     )
+
+
+@router.get("/{file_id}", response_model=FileResponse)
+def get_file(
+    file_id: UUID = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get file metadata by ID"""
+    file_service = FileService(db)
+    return file_service.get_file_by_id(file_id, user_id=current_user.id, is_admin=current_user.is_admin)
+
+
+@router.put("/{file_id}/move", response_model=FileResponse)
+def move_file(
+    file_id: UUID = Path(...),
+    move_request: FileMoveRequest = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Move a file to a different folder. Set folder_id to null to move to root."""
+    file_service = FileService(db)
+    return file_service.move_file(
+        file_id, 
+        move_request.folder_id if move_request else None,
+        user_id=current_user.id,
+        is_admin=current_user.is_admin
+    )
+
+
+@router.put("/{file_id}", response_model=FileResponse)
+def update_file(
+    file_id: UUID = Path(...),
+    update_request: FileUpdateRequest = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update file metadata and visibility. Use this to toggle public/private."""
+    file_service = FileService(db)
+    return file_service.update_file_visibility(
+        file_id=file_id,
+        is_public=update_request.is_public if update_request else None,
+        description=update_request.description if update_request else None,
+        file_type=update_request.file_type if update_request else None,
+        tags=update_request.tags if update_request else None,
+        custom_name=update_request.custom_name if update_request else None,
+        user_id=current_user.id,
+        is_admin=current_user.is_admin
+    )
+
+
+@router.delete("/{file_id}")
+async def delete_file(
+    file_id: UUID = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a file"""
+    file_service = FileService(db)
+    await file_service.delete_file(file_id, user_id=current_user.id, is_admin=current_user.is_admin)
+    return {"message": "File deleted successfully"}
+
