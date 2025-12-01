@@ -1,4 +1,4 @@
-import { Upload, Files, FileStack, FolderOpen } from 'lucide-react';
+import { Upload, Files, FileStack, FolderOpen, Users } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import {
   Sidebar,
@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useAuthStore } from '@/store/auth-store';
 
 const menuItems = [
   { title: 'Browse Files', url: '/dashboard/browse', icon: FolderOpen },
@@ -18,8 +19,13 @@ const menuItems = [
   { title: 'All Files', url: '/dashboard/files', icon: Files },
 ];
 
+const adminMenuItems = [
+  { title: 'Manage Users', url: '/dashboard/users', icon: Users },
+];
+
 export function AppSidebar() {
   const { open } = useSidebar();
+  const { user } = useAuthStore();
 
   return (
     <Sidebar collapsible="icon">
@@ -48,6 +54,33 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin Section - only visible to admins */}
+        {user?.is_admin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center gap-2">
+              {open && <span>Admin</span>}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        className="flex items-center gap-3"
+                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );

@@ -3,7 +3,8 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useAuthStore } from '@/store/auth-store';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { LogOut, Shield } from 'lucide-react';
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -25,6 +26,12 @@ export default function DashboardLayout() {
               <h1 className="text-lg font-semibold">File Manager</h1>
             </div>
             <div className="flex items-center gap-4">
+              {user?.is_admin && (
+                <Badge variant="secondary" className="bg-purple-100 text-purple-700 hidden sm:flex">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Admin
+                </Badge>
+              )}
               <span className="text-sm text-muted-foreground hidden sm:inline">
                 {user?.email}
               </span>
